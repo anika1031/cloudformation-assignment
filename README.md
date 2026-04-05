@@ -37,7 +37,9 @@ Lambda Functions
      ↓
 DynamoDB
 ```
- 
+ ### Dashboard
+<img width="1014" height="909" alt="image" src="https://github.com/user-attachments/assets/45484370-d3fe-497e-9304-420e24e7c8d0" />
+
 ---
  
 ##  Part 1: Deploy Infrastructure (CloudFormation)
