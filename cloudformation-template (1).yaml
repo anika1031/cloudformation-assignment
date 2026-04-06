@@ -1,0 +1,295 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Birthday Reminder App CloudFormation Template - Creates Lambda, API Gateway, DynamoDB, and IAM roles'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+    Description: Environment name (dev, staging, prod)
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+Resources:
+  # DynamoDB Table for storing birthdays
+  BirthdaysTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'birthdays-${EnvironmentName}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: birthMonth
+          AttributeType: N
+        - AttributeName: sortKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: birthMonth
+          KeyType: HASH
+        - AttributeName: sortKey
+          KeyType: RANGE
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Application
+          Value: BirthdayReminder
+
+  # IAM Role for Lambda execution
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'birthday-reminder-lambda-role-${EnvironmentName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+     
+  # Lambda Function for listing birthdays
+  ListBirthdaysFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'birthday-reminder-list-${EnvironmentName}'
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref BirthdaysTable
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          from datetime import datetime
+          from decimal import Decimal
+
+          dynamodb = boto3.resource('dynamodb')
+
+          def lambda_handler(event, context):
+              try:
+                  table = dynamodb.Table(os.environ['TABLE_NAME'])
+
+                  # Get current month (1-12)
+                  current_month = datetime.now().month
+
+                  # Query all birthdays for current month
+                  response = table.query(
+                      KeyConditionExpression='birthMonth = :month',
+                      ExpressionAttributeValues={
+                          ':month': current_month
+                      }
+                  )
+
+                  birthdays = response.get('Items', [])
+
+                  # Convert Decimal to int/string for JSON serialization
+                  birthdays = json.loads(json.dumps(birthdays, default=str))
+
+                  return {
+                      'statusCode': 200,
+                      'headers': {'Content-Type': 'application/json'},
+                      'body': json.dumps({
+                          'success': True,
+                          'currentMonth': current_month,
+                          'count': len(birthdays),
+                          'birthdays': birthdays
+                      })
+                  }
+              except Exception as e:
+                  return {
+                      'statusCode': 500,
+                      'headers': {'Content-Type': 'application/json'},
+                      'body': json.dumps({
+                          'success': False,
+                          'error': str(e)
+                      })
+                  }
+
+  # Lambda Function for creating birthdays
+  CreateBirthdayFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'birthday-reminder-create-${EnvironmentName}'
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref BirthdaysTable
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          from uuid import uuid4
+          from datetime import datetime
+
+          dynamodb = boto3.resource('dynamodb')
+
+          def lambda_handler(event, context):
+              try:
+                  # Parse request body
+                  body = json.loads(event['body']) if isinstance(event.get('body'), str) else event.get('body', {})
+
+                  # Validate required fields
+                  required_fields = ['name', 'birthDate', 'birthMonth', 'birthDay', 'birthYear']
+                  for field in required_fields:
+                      if field not in body:
+                          return {
+                              'statusCode': 400,
+                              'headers': {'Content-Type': 'application/json'},
+                              'body': json.dumps({
+                                  'success': False,
+                                  'error': f'Missing required field: {field}'
+                              })
+                          }
+
+                  # Generate unique ID if not provided
+                  person_id = body.get('personId', str(uuid4()))
+
+                  # Create sort key: birthDay#personId
+                  sort_key = f"{body['birthDay']}#{person_id}"
+
+                  # Create item with new schema
+                  item = {
+                      'birthMonth': int(body['birthMonth']),
+                      'sortKey': sort_key,
+                      'personId': person_id,
+                      'name': body['name'],
+                      'birthDate': body['birthDate'],
+                      'birthDay': int(body['birthDay']),
+                      'birthYear': int(body['birthYear']),
+                      'email': body.get('email', ''),
+                      'phone': body.get('phone', '')
+                  }
+
+                  # Get table and put item
+                  table = dynamodb.Table(os.environ['TABLE_NAME'])
+                  table.put_item(Item=item)
+
+                  return {
+                      'statusCode': 201,
+                      'headers': {'Content-Type': 'application/json'},
+                      'body': json.dumps({
+                          'success': True,
+                          'message': 'Birthday created successfully',
+                          'personId': person_id
+                      })
+                  }
+
+              except Exception as e:
+                  return {
+                      'statusCode': 500,
+                      'headers': {'Content-Type': 'application/json'},
+                      'body': json.dumps({
+                          'success': False,
+                          'error': str(e)
+                      })
+                  }
+
+  # API Gateway REST API
+  BirthdayReminderAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub 'birthday-reminder-api-${EnvironmentName}'
+      Description: Birthday Reminder API with list and create endpoints
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  # API Gateway Resource for /birthdays
+  BirthdaysResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref BirthdayReminderAPI
+      ParentId: !GetAtt BirthdayReminderAPI.RootResourceId
+      PathPart: birthdays
+
+  # GET /birthdays endpoint
+  GetBirthdaysMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref BirthdayReminderAPI
+      ResourceId: !Ref BirthdaysResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ListBirthdaysFunction.Arn}/invocations'
+
+  # POST /birthdays endpoint
+  CreateBirthdayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref BirthdayReminderAPI
+      ResourceId: !Ref BirthdaysResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateBirthdayFunction.Arn}/invocations'
+
+  # Lambda permissions for API Gateway
+  ListBirthdaysAPIPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ListBirthdaysFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${BirthdayReminderAPI}/*/*'
+
+  CreateBirthdayAPIPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CreateBirthdayFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${BirthdayReminderAPI}/*/*'
+
+  # API Gateway Deployment
+  APIDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - GetBirthdaysMethod
+      - CreateBirthdayMethod
+    Properties:
+      RestApiId: !Ref BirthdayReminderAPI
+      StageName: !Ref EnvironmentName
+
+Outputs:
+  APIEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${BirthdayReminderAPI}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}'
+    Export:
+      Name: !Sub 'BirthdayReminderAPIEndpoint-${EnvironmentName}'
+
+  DynamoDBTableName:
+    Description: DynamoDB table name for birthdays
+    Value: !Ref BirthdaysTable
+    Export:
+      Name: !Sub 'BirthdayTableName-${EnvironmentName}'
+
+  LambdaRoleArn:
+    Description: IAM Role ARN for Lambda functions
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub 'BirthdayReminderLambdaRoleArn-${EnvironmentName}'
+
+  ListBirthdaysFunctionArn:
+    Description: ARN of List Birthdays Lambda Function
+    Value: !GetAtt ListBirthdaysFunction.Arn
+    Export:
+      Name: !Sub 'ListBirthdaysFunctionArn-${EnvironmentName}'
+
+  CreateBirthdayFunctionArn:
+    Description: ARN of Create Birthday Lambda Function
+    Value: !GetAtt CreateBirthdayFunction.Arn
+    Export:
+      Name: !Sub 'CreateBirthdayFunctionArn-${EnvironmentName}'
