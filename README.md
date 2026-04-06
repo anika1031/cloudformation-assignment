@@ -148,7 +148,7 @@ return {
     'body': json.dumps(data)
 }
 ```
- 
+Note: If you still face CORS issues, ensure your API supports OPTIONS method.
 ---
  
 ##  Part 5: Test the API
@@ -218,7 +218,6 @@ Add the following bucket policy (replace `YOUR-BUCKET-NAME`):
 - [ ] CloudFormation stack status: `CREATE_COMPLETE`
 - [ ] API Gateway deployed to `dev` stage
 - [ ] IAM role has DynamoDB permissions
-- [ ] CORS enabled on API Gateway
 - [ ] Lambda returns CORS headers
 - [ ] GET `/birthdays` returns data
 - [ ] POST `/birthdays` adds a record
