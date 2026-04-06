@@ -132,15 +132,8 @@ When connecting the frontend, you may see:
  
 ```
 blocked by CORS policy
-```
- 
-###  Step 1: Enable CORS in API Gateway
- 
-- Select the resource (`/birthdays`)
-- Click **Actions → Enable CORS**
-- Deploy API again
- 
-###  Step 2: Add CORS Headers in Lambda
+``` 
+###  Step 1: Add CORS Headers in Lambda
  
 Modify your Lambda response to include the following headers:
  
