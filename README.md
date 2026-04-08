@@ -23,7 +23,16 @@ The application should allow users to:
 | IAM | Permissions & security |
  
 ---
- 
+
+## Example Assignment Deployment
+
+You can refer to a sample working project below:
+
+Mohan's Deployment (Staging):
+---> https://staging.d304zajv3i3izo.amplifyapp.com/
+
+---
+
 ##  Architecture Overview
  
 ```
