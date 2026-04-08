@@ -12,6 +12,7 @@ Parameters:
       - prod
 
 Resources:
+
   # DynamoDB Table for storing birthdays
   BirthdaysTable:
     Type: AWS::DynamoDB::Table
@@ -48,7 +49,7 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-     
+
   # Lambda Function for listing birthdays
   ListBirthdaysFunction:
     Type: AWS::Lambda::Function
@@ -74,10 +75,8 @@ Resources:
               try:
                   table = dynamodb.Table(os.environ['TABLE_NAME'])
 
-                  # Get current month (1-12)
                   current_month = datetime.now().month
 
-                  # Query all birthdays for current month
                   response = table.query(
                       KeyConditionExpression='birthMonth = :month',
                       ExpressionAttributeValues={
@@ -86,17 +85,15 @@ Resources:
                   )
 
                   birthdays = response.get('Items', [])
-
-                  # Convert Decimal to int/string for JSON serialization
                   birthdays = json.loads(json.dumps(birthdays, default=str))
 
                   return {
                       'statusCode': 200,
                       'headers': {
-                      'Content-Type': 'application/json',
-                      'Access-Control-Allow-Origin': '*',
-                      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                      'Access-Control-Allow-Headers': 'Content-Type'
+                          'Content-Type': 'application/json',
+                          'Access-Control-Allow-Origin': '*',
+                          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                          'Access-Control-Allow-Headers': 'Content-Type'
                       },
                       'body': json.dumps({
                           'success': True,
@@ -105,14 +102,15 @@ Resources:
                           'birthdays': birthdays
                       })
                   }
+
               except Exception as e:
                   return {
                       'statusCode': 500,
                       'headers': {
-                      'Content-Type': 'application/json',
-                      'Access-Control-Allow-Origin': '*',
-                      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                      'Access-Control-Allow-Headers': 'Content-Type'
+                          'Content-Type': 'application/json',
+                          'Access-Control-Allow-Origin': '*',
+                          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                          'Access-Control-Allow-Headers': 'Content-Type'
                       },
                       'body': json.dumps({
                           'success': False,
@@ -137,26 +135,23 @@ Resources:
           import boto3
           import os
           from uuid import uuid4
-          from datetime import datetime
 
           dynamodb = boto3.resource('dynamodb')
 
           def lambda_handler(event, context):
               try:
-                  # Parse request body
                   body = json.loads(event['body']) if isinstance(event.get('body'), str) else event.get('body', {})
 
-                  # Validate required fields
                   required_fields = ['name', 'birthDate', 'birthMonth', 'birthDay', 'birthYear']
                   for field in required_fields:
                       if field not in body:
                           return {
                               'statusCode': 400,
                               'headers': {
-                              'Content-Type': 'application/json',
-                              'Access-Control-Allow-Origin': '*',
-                              'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                              'Access-Control-Allow-Headers': 'Content-Type'
+                                  'Content-Type': 'application/json',
+                                  'Access-Control-Allow-Origin': '*',
+                                  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                                  'Access-Control-Allow-Headers': 'Content-Type'
                               },
                               'body': json.dumps({
                                   'success': False,
@@ -164,13 +159,9 @@ Resources:
                               })
                           }
 
-                  # Generate unique ID if not provided
                   person_id = body.get('personId', str(uuid4()))
-
-                  # Create sort key: birthDay#personId
                   sort_key = f"{body['birthDay']}#{person_id}"
 
-                  # Create item with new schema
                   item = {
                       'birthMonth': int(body['birthMonth']),
                       'sortKey': sort_key,
@@ -183,17 +174,16 @@ Resources:
                       'phone': body.get('phone', '')
                   }
 
-                  # Get table and put item
                   table = dynamodb.Table(os.environ['TABLE_NAME'])
                   table.put_item(Item=item)
 
                   return {
                       'statusCode': 201,
                       'headers': {
-                      'Content-Type': 'application/json',
-                      'Access-Control-Allow-Origin': '*',
-                      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                      'Access-Control-Allow-Headers': 'Content-Type'
+                          'Content-Type': 'application/json',
+                          'Access-Control-Allow-Origin': '*',
+                          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                          'Access-Control-Allow-Headers': 'Content-Type'
                       },
                       'body': json.dumps({
                           'success': True,
@@ -206,10 +196,10 @@ Resources:
                   return {
                       'statusCode': 500,
                       'headers': {
-                      'Content-Type': 'application/json',
-                      'Access-Control-Allow-Origin': '*',
-                      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                      'Access-Control-Allow-Headers': 'Content-Type'
+                          'Content-Type': 'application/json',
+                          'Access-Control-Allow-Origin': '*',
+                          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                          'Access-Control-Allow-Headers': 'Content-Type'
                       },
                       'body': json.dumps({
                           'success': False,
@@ -222,12 +212,10 @@ Resources:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: !Sub 'birthday-reminder-api-${EnvironmentName}'
-      Description: Birthday Reminder API with list and create endpoints
       EndpointConfiguration:
         Types:
           - REGIONAL
 
-  # API Gateway Resource for /birthdays
   BirthdaysResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -235,7 +223,6 @@ Resources:
       ParentId: !GetAtt BirthdayReminderAPI.RootResourceId
       PathPart: birthdays
 
-  # GET /birthdays endpoint
   GetBirthdaysMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -246,9 +233,9 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ListBirthdaysFunction.Arn}/invocations'
+        Uri: !Sub >
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ListBirthdaysFunction.Arn}/invocations
 
-  # POST /birthdays endpoint
   CreateBirthdayMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -259,9 +246,9 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateBirthdayFunction.Arn}/invocations'
+        Uri: !Sub >
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateBirthdayFunction.Arn}/invocations
 
-  # Lambda permissions for API Gateway
   ListBirthdaysAPIPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -278,7 +265,6 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${BirthdayReminderAPI}/*/*'
 
-  # API Gateway Deployment
   APIDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -290,31 +276,7 @@ Resources:
 
 Outputs:
   APIEndpoint:
-    Description: API Gateway endpoint URL
     Value: !Sub 'https://${BirthdayReminderAPI}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}'
-    Export:
-      Name: !Sub 'BirthdayReminderAPIEndpoint-${EnvironmentName}'
 
   DynamoDBTableName:
-    Description: DynamoDB table name for birthdays
     Value: !Ref BirthdaysTable
-    Export:
-      Name: !Sub 'BirthdayTableName-${EnvironmentName}'
-
-  LambdaRoleArn:
-    Description: IAM Role ARN for Lambda functions
-    Value: !GetAtt LambdaExecutionRole.Arn
-    Export:
-      Name: !Sub 'BirthdayReminderLambdaRoleArn-${EnvironmentName}'
-
-  ListBirthdaysFunctionArn:
-    Description: ARN of List Birthdays Lambda Function
-    Value: !GetAtt ListBirthdaysFunction.Arn
-    Export:
-      Name: !Sub 'ListBirthdaysFunctionArn-${EnvironmentName}'
-
-  CreateBirthdayFunctionArn:
-    Description: ARN of Create Birthday Lambda Function
-    Value: !GetAtt CreateBirthdayFunction.Arn
-    Export:
-      Name: !Sub 'CreateBirthdayFunctionArn-${EnvironmentName}'
