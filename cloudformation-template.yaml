@@ -92,7 +92,12 @@ Resources:
 
                   return {
                       'statusCode': 200,
-                      'headers': {'Content-Type': 'application/json'},
+                      'headers': {
+                      'Content-Type': 'application/json',
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                      'Access-Control-Allow-Headers': 'Content-Type'
+                      },
                       'body': json.dumps({
                           'success': True,
                           'currentMonth': current_month,
@@ -103,7 +108,12 @@ Resources:
               except Exception as e:
                   return {
                       'statusCode': 500,
-                      'headers': {'Content-Type': 'application/json'},
+                      'headers': {
+                      'Content-Type': 'application/json',
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                      'Access-Control-Allow-Headers': 'Content-Type'
+                      },
                       'body': json.dumps({
                           'success': False,
                           'error': str(e)
@@ -142,7 +152,12 @@ Resources:
                       if field not in body:
                           return {
                               'statusCode': 400,
-                              'headers': {'Content-Type': 'application/json'},
+                              'headers': {
+                              'Content-Type': 'application/json',
+                              'Access-Control-Allow-Origin': '*',
+                              'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                              'Access-Control-Allow-Headers': 'Content-Type'
+                              },
                               'body': json.dumps({
                                   'success': False,
                                   'error': f'Missing required field: {field}'
@@ -174,7 +189,12 @@ Resources:
 
                   return {
                       'statusCode': 201,
-                      'headers': {'Content-Type': 'application/json'},
+                      'headers': {
+                      'Content-Type': 'application/json',
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                      'Access-Control-Allow-Headers': 'Content-Type'
+                      },
                       'body': json.dumps({
                           'success': True,
                           'message': 'Birthday created successfully',
@@ -185,7 +205,12 @@ Resources:
               except Exception as e:
                   return {
                       'statusCode': 500,
-                      'headers': {'Content-Type': 'application/json'},
+                      'headers': {
+                      'Content-Type': 'application/json',
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                      'Access-Control-Allow-Headers': 'Content-Type'
+                      },
                       'body': json.dumps({
                           'success': False,
                           'error': str(e)
