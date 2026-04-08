@@ -1,7 +1,5 @@
 # cloudformation-assignment
 
-# AWS Serverless Birthday Reminder Application
- 
 ## Objective
  
 Build a serverless Birthday Reminder application using AWS services.
